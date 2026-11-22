@@ -2,242 +2,297 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>UPI Offline Mesh — Demo</title>
-    <style>
-        * { box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            margin: 0; padding: 24px; background: #0d1117; color: #e6edf3;
-        }
-        h1 { margin-top: 0; color: #f0f6fc; }
-        h2 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 4px; margin-top: 32px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .grid { display: grid; gap: 16px; }
-        .grid-2 { grid-template-columns: 1fr 1fr; }
-        .grid-3 { grid-template-columns: repeat(3, 1fr); }
-        .card {
-            background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px;
-        }
-        .device {
-            border: 1px solid #30363d; border-radius: 6px; padding: 12px; margin-bottom: 8px;
-            background: #0d1117;
-        }
-        .device.bridge { border-color: #2ea043; background: #052e16; }
-        .device.offline { opacity: 0.85; }
-        .badge {
-            display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px;
-            font-weight: 600; margin-left: 8px;
-        }
-        .badge-online { background: #2ea043; color: white; }
-        .badge-offline { background: #6e7681; color: white; }
-        .packet-id {
-            font-family: 'Consolas', 'Monaco', monospace; font-size: 11px;
-            background: #21262d; padding: 2px 6px; border-radius: 3px; margin: 2px;
-            display: inline-block;
-        }
-        button {
-            background: #238636; color: white; border: none; padding: 8px 16px;
-            border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
-            margin: 4px;
-        }
-        button:hover { background: #2ea043; }
-        button.danger { background: #da3633; }
-        button.danger:hover { background: #f85149; }
-        button.secondary { background: #1f6feb; }
-        button.secondary:hover { background: #388bfd; }
-        input, select {
-            background: #0d1117; color: #e6edf3; border: 1px solid #30363d;
-            border-radius: 4px; padding: 6px 10px; font-size: 14px; margin: 4px;
-        }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #30363d; }
-        th { color: #8b949e; font-weight: 600; font-size: 12px; text-transform: uppercase; }
-        .status-SETTLED { color: #56d364; font-weight: 600; }
-        .status-REJECTED { color: #f85149; font-weight: 600; }
-        .status-DUPLICATE_DROPPED { color: #d29922; font-weight: 600; }
-        .status-INVALID { color: #f85149; font-weight: 600; }
-        #log {
-            background: #010409; color: #7ee787; padding: 12px; border-radius: 6px;
-            font-family: 'Consolas', 'Monaco', monospace; font-size: 12px;
-            max-height: 220px; overflow-y: auto; white-space: pre-wrap;
-            border: 1px solid #30363d;
-        }
-        .controls { background: #161b22; padding: 16px; border-radius: 8px;
-                    border: 1px solid #30363d; margin-bottom: 16px; }
-        .step-num {
-            display: inline-block; background: #58a6ff; color: white;
-            border-radius: 50%; width: 24px; height: 24px; text-align: center;
-            line-height: 24px; font-weight: 600; margin-right: 8px;
-        }
-        .balance { font-family: 'Consolas', monospace; color: #56d364; font-weight: 600; }
-        .small { font-size: 12px; color: #8b949e; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>UPI Offline Mesh</title>
+    <meta name="description" content="Live dashboard for offline UPI payments relayed over a Bluetooth-style mesh.">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='9' cy='22' r='3' fill='white'/%3E%3Ccircle cx='16' cy='10' r='3' fill='white'/%3E%3Ccircle cx='23' cy='22' r='3' fill='white'/%3E%3Cpath d='M9 22L16 10L23 22Z' fill='none' stroke='white' stroke-width='1.6'/%3E%3C/svg%3E">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}" href="/css/dashboard.css">
+    <script>
+        // Apply saved theme before first paint to avoid a flash.
+        try {
+            var t = localStorage.getItem('upimesh-theme');
+            if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+    </script>
 </head>
 <body>
-<div class="container">
-    <h1>📡 UPI Offline Mesh — Live Demo</h1>
-    <p class="small">
-        Send money in a basement with zero internet. Encrypted packets gossip from phone to phone
-        until one with 4G reaches the backend.
-    </p>
 
-    <div class="controls">
-        <h3 style="margin-top:0">🎬 Demo Flow</h3>
-
-        <div>
-            <span class="step-num">1</span><strong>Compose payment</strong> (simulates sender phone)
-            <br>
-            <select id="senderVpa">
-                <option>alice@demo</option>
-                <option>bob@demo</option>
-                <option>carol@demo</option>
-            </select>
-            →
-            <select id="receiverVpa">
-                <option>bob@demo</option>
-                <option>carol@demo</option>
-                <option>alice@demo</option>
-                <option>dave@demo</option>
-            </select>
-            ₹<input type="number" id="amount" value="500" style="width: 100px">
-            PIN <input type="text" id="pin" value="1234" style="width: 80px" maxlength="4">
-            <button onclick="sendPacket()">📤 Inject into Mesh</button>
+<header class="topbar">
+    <div class="topbar-inner">
+        <div class="brand">
+            <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+                <rect width="32" height="32" rx="8" fill="currentColor"/>
+                <path d="M9 22L16 10L23 22Z" fill="none" stroke="#fff" stroke-width="1.6"/>
+                <circle cx="9" cy="22" r="3" fill="#fff"/><circle cx="16" cy="10" r="3" fill="#fff"/><circle cx="23" cy="22" r="3" fill="#fff"/>
+            </svg>
+            <div>
+                <div class="brand-name">UPI Offline Mesh</div>
+                <div class="brand-sub">Payments that hop phone-to-phone until one finds signal</div>
+            </div>
         </div>
-
-        <div style="margin-top: 16px">
-            <span class="step-num">2</span><strong>Gossip</strong> — packets hop device-to-device
-            <button class="secondary" onclick="gossip()">🔄 Run Gossip Round</button>
-        </div>
-
-        <div style="margin-top: 16px">
-            <span class="step-num">3</span><strong>Bridge node walks outside, hits 4G</strong>
-            <button class="secondary" onclick="flushBridges()">📡 Bridges Upload to Backend</button>
-            <span class="small">(parallel — exercises idempotency)</span>
-        </div>
-
-        <div style="margin-top: 16px">
-            <button class="danger" onclick="resetMesh()">🗑 Reset Mesh + Cache</button>
-        </div>
-    </div>
-
-    <div class="grid grid-2">
-        <div class="card">
-            <h2>📱 Mesh Devices</h2>
-            <div id="devices"></div>
-        </div>
-
-        <div class="card">
-            <h2>🏦 Account Balances</h2>
-            <table id="accounts-table">
-                <thead><tr><th>VPA</th><th>Holder</th><th>Balance</th></tr></thead>
-                <tbody></tbody>
-            </table>
-            <p class="small" id="cacheInfo"></p>
-        </div>
-    </div>
-
-    <div class="card" style="margin-top: 16px">
-        <h2>📜 Transaction Ledger</h2>
-        <table id="tx-table">
-            <thead><tr>
-                <th>ID</th><th>From</th><th>To</th><th>Amount</th>
-                <th>Status</th><th>Bridge</th><th>Hops</th><th>Settled</th>
-            </tr></thead>
-            <tbody></tbody>
-        </table>
-    </div>
-
-    <div class="card" style="margin-top: 16px">
-        <h2>🪵 Activity Log</h2>
-        <div id="log"></div>
-    </div>
-</div>
-
-<script>
-function log(msg) {
-    const el = document.getElementById('log');
-    el.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg + '\n' + el.textContent;
-}
-
-async function refresh() {
-    // Mesh state
-    const m = await fetch('/api/mesh/state').then(r => r.json());
-    const devicesDiv = document.getElementById('devices');
-    devicesDiv.innerHTML = m.devices.map(d => `
-        <div class="device ${d.hasInternet ? 'bridge' : 'offline'}">
-            <strong>${d.deviceId}</strong>
-            <span class="badge ${d.hasInternet ? 'badge-online' : 'badge-offline'}">
-                ${d.hasInternet ? '🌐 4G' : '🚫 OFFLINE'}
+        <div class="topbar-actions">
+            <span class="pill pill-muted hide-sm" id="cryptoPill" title="Hybrid encryption scheme">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 7V5a4 4 0 1 1 8 0v2h.5A1.5 1.5 0 0 1 14 8.5v5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-5A1.5 1.5 0 0 1 3.5 7H4Zm1.5 0h5V5a2.5 2.5 0 0 0-5 0v2Z" fill="currentColor"/></svg>
+                <span id="cryptoText">RSA-2048 · AES-256-GCM</span>
             </span>
-            <span class="small">holding ${d.packetCount} packet(s)</span>
-            <div>${d.packetIds.map(id => `<span class="packet-id">${id}</span>`).join('')}</div>
+            <span class="pill" id="connPill" data-state="connecting">
+                <span class="dot"></span><span id="connText">Connecting…</span>
+            </span>
+            <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle colour theme" title="Toggle theme">
+                <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+                <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z" fill="currentColor"/></svg>
+            </button>
         </div>
-    `).join('');
-    document.getElementById('cacheInfo').textContent =
-        `Idempotency cache size: ${m.idempotencyCacheSize}`;
+    </div>
+</header>
 
-    // Accounts
-    const accs = await fetch('/api/accounts').then(r => r.json());
-    document.querySelector('#accounts-table tbody').innerHTML = accs.map(a => `
-        <tr><td>${a.vpa}</td><td>${a.holderName}</td>
-            <td class="balance">₹${parseFloat(a.balance).toFixed(2)}</td></tr>
-    `).join('');
+<main class="page">
 
-    // Transactions
-    const txs = await fetch('/api/transactions').then(r => r.json());
-    document.querySelector('#tx-table tbody').innerHTML = txs.map(t => `
-        <tr>
-            <td>${t.id}</td><td>${t.senderVpa}</td><td>${t.receiverVpa}</td>
-            <td class="balance">₹${parseFloat(t.amount).toFixed(2)}</td>
-            <td class="status-${t.status}">${t.status}</td>
-            <td>${t.bridgeNodeId}</td><td>${t.hopCount}</td>
-            <td class="small">${new Date(t.settledAt).toLocaleTimeString()}</td>
-        </tr>
-    `).join('');
-}
+    <!-- KPI strip -->
+    <section class="kpis" aria-label="Summary">
+        <div class="kpi">
+            <div class="kpi-label">Money in system</div>
+            <div class="kpi-value" id="kpiTotal">—</div>
+            <div class="kpi-sub" id="kpiTotalSub">&nbsp;</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Settled</div>
+            <div class="kpi-value" id="kpiSettled">—</div>
+            <div class="kpi-sub" id="kpiSettledSub">&nbsp;</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Rejected</div>
+            <div class="kpi-value" id="kpiRejected">—</div>
+            <div class="kpi-sub">insufficient balance</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Packets in mesh</div>
+            <div class="kpi-value" id="kpiPackets">—</div>
+            <div class="kpi-sub" id="kpiPacketsSub">&nbsp;</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Idempotency cache</div>
+            <div class="kpi-value" id="kpiCache">—</div>
+            <div class="kpi-sub">ciphertext hashes claimed</div>
+        </div>
+    </section>
 
-async function sendPacket() {
-    const body = {
-        senderVpa: document.getElementById('senderVpa').value,
-        receiverVpa: document.getElementById('receiverVpa').value,
-        amount: parseFloat(document.getElementById('amount').value),
-        pin: document.getElementById('pin').value,
-        ttl: 5,
-        startDevice: 'phone-alice'
-    };
-    const r = await fetch('/api/demo/send', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body)
-    }).then(r => r.json());
-    log(`📤 Packet ${r.packetId.substring(0,8)} encrypted & injected at ${r.injectedAt} (TTL ${r.ttl})`);
-    log(`   ciphertext (truncated): ${r.ciphertextPreview}`);
-    refresh();
-}
+    <div class="layout">
 
-async function gossip() {
-    const r = await fetch('/api/mesh/gossip', {method: 'POST'}).then(r => r.json());
-    log(`🔄 Gossip: ${r.transfers} transfer(s) — ${JSON.stringify(r.deviceCounts)}`);
-    refresh();
-}
+        <!-- ============ Left column: compose ============ -->
+        <aside class="col-left">
+            <section class="card" aria-labelledby="composeTitle">
+                <div class="card-head">
+                    <div>
+                        <h2 id="composeTitle">New payment</h2>
+                        <p class="card-sub">Built and encrypted as if on the sender's phone</p>
+                    </div>
+                    <span class="pill pill-offline"><span class="dot"></span>No internet</span>
+                </div>
 
-async function flushBridges() {
-    const r = await fetch('/api/mesh/flush', {method: 'POST'}).then(r => r.json());
-    log(`📡 ${r.uploadsAttempted} bridge upload(s):`);
-    r.results.forEach(res => {
-        log(`   ${res.bridgeNode} packet ${res.packetId} → ${res.outcome}` +
-            (res.reason ? ` (${res.reason})` : ''));
-    });
-    refresh();
-}
+                <form id="composeForm" class="compose" novalidate>
+                    <div class="party-row">
+                        <label class="field">
+                            <span class="field-label">From</span>
+                            <select id="senderVpa" required></select>
+                            <span class="field-hint" id="senderHint">&nbsp;</span>
+                        </label>
+                        <button type="button" class="swap-btn" id="swapBtn" aria-label="Swap sender and receiver" title="Swap">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <label class="field">
+                            <span class="field-label">To</span>
+                            <select id="receiverVpa" required></select>
+                            <span class="field-hint" id="receiverHint">&nbsp;</span>
+                        </label>
+                    </div>
 
-async function resetMesh() {
-    await fetch('/api/mesh/reset', {method: 'POST'});
-    log('🗑 mesh + idempotency cache cleared');
-    refresh();
-}
+                    <label class="field">
+                        <span class="field-label">Amount</span>
+                        <div class="amount-input">
+                            <span class="currency">₹</span>
+                            <input type="number" id="amount" value="500" min="0.01" step="0.01" inputmode="decimal" required aria-describedby="amountMsg">
+                        </div>
+                    </label>
+                    <div class="chips" role="group" aria-label="Quick amounts">
+                        <button type="button" class="chip" data-amount="100">₹100</button>
+                        <button type="button" class="chip" data-amount="500">₹500</button>
+                        <button type="button" class="chip" data-amount="1000">₹1,000</button>
+                        <button type="button" class="chip" data-amount="2000">₹2,000</button>
+                    </div>
+                    <div class="form-msg" id="amountMsg" aria-live="polite"></div>
 
-refresh();
-setInterval(refresh, 3000);
-</script>
+                    <div class="two-col">
+                        <label class="field">
+                            <span class="field-label">UPI PIN</span>
+                            <input type="password" id="pin" value="1234" maxlength="4" inputmode="numeric" autocomplete="off" pattern="\d{4}" required class="pin-input">
+                        </label>
+                        <label class="field">
+                            <span class="field-label">Broadcast from</span>
+                            <select id="startDevice"></select>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block" id="sendBtn">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 20 4l-5 16-3-7-8-1Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+                        Encrypt &amp; broadcast
+                    </button>
+                    <p class="fine">The PIN is SHA-256 hashed inside the encrypted payload. Relaying phones only see the packet ID and TTL.</p>
+                </form>
+
+                <div class="receipt" id="receipt" hidden>
+                    <div class="receipt-head">
+                        <span class="packet-swatch" id="receiptSwatch"></span>
+                        <strong>Packet <span class="mono" id="receiptId"></span></strong>
+                        <span class="pill pill-muted" id="receiptTtl"></span>
+                    </div>
+                    <div class="receipt-row"><span>Route</span><span id="receiptRoute"></span></div>
+                    <div class="receipt-row"><span>Injected at</span><span class="mono" id="receiptDevice"></span></div>
+                    <div class="cipher mono" id="receiptCipher" title="What every relaying phone sees"></div>
+                </div>
+            </section>
+
+            <section class="card" aria-labelledby="labTitle">
+                <div class="card-head">
+                    <div>
+                        <h2 id="labTitle">Security lab</h2>
+                        <p class="card-sub">Try to break it — the backend should refuse</p>
+                    </div>
+                </div>
+                <div class="lab-item">
+                    <div>
+                        <div class="lab-title">Forged packet</div>
+                        <div class="lab-desc">An attacker posts random bytes straight to <span class="mono">/api/bridge/ingest</span>. Decryption fails, nothing settles.</div>
+                    </div>
+                    <button type="button" class="btn btn-ghost" id="forgeBtn">Send forgery</button>
+                </div>
+                <div class="lab-item">
+                    <div>
+                        <div class="lab-title">Replay delivery</div>
+                        <div class="lab-desc">The bridge uploads everything it holds again. Each ciphertext hash is already claimed, so all are dropped.</div>
+                    </div>
+                    <button type="button" class="btn btn-ghost" id="replayBtn">Replay uploads</button>
+                </div>
+            </section>
+        </aside>
+
+        <!-- ============ Right column: mesh ============ -->
+        <div class="col-right">
+            <section class="card mesh-card" aria-labelledby="meshTitle">
+                <div class="card-head wrap">
+                    <div>
+                        <h2 id="meshTitle">Mesh network</h2>
+                        <p class="card-sub">Encrypted packets gossip over Bluetooth until a bridge phone reaches 4G</p>
+                    </div>
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-secondary" id="gossipBtn" title="Every device shares its packets with every other device; TTL drops by one per hop">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            Gossip round
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="flushBtn" title="Bridge phones walk outside and upload everything they hold, in parallel">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V8M7 13l5-5 5 5M5 4h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            Bridge upload
+                        </button>
+                        <button type="button" class="btn btn-primary" id="autoBtn" title="Compose → gossip → upload, one after another">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8Z" fill="currentColor"/></svg>
+                            Run full journey
+                        </button>
+                        <button type="button" class="icon-btn danger" id="resetBtn" title="Clear all packets from the mesh and empty the idempotency cache (balances and ledger stay)" aria-label="Reset mesh and cache">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <ol class="stepper" id="stepper">
+                    <li data-step="1"><span class="step-dot">1</span><span>Compose</span></li>
+                    <li data-step="2"><span class="step-dot">2</span><span>Gossip</span></li>
+                    <li data-step="3"><span class="step-dot">3</span><span>Bridge upload</span></li>
+                    <li data-step="4"><span class="step-dot">4</span><span>Settled</span></li>
+                </ol>
+
+                <div class="mesh-wrap">
+                    <svg id="meshSvg" viewBox="0 0 720 340" role="img" aria-label="Mesh network diagram">
+                        <defs>
+                            <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                                <line x1="0" y1="0" x2="0" y2="8" class="hatch-line"/>
+                            </pattern>
+                        </defs>
+                        <g id="meshZones"></g>
+                        <g id="meshEdges"></g>
+                        <g id="meshNodes"></g>
+                        <g id="meshFx"></g>
+                    </svg>
+                </div>
+
+                <div class="legend">
+                    <span><i class="lg lg-ble"></i>Bluetooth range</span>
+                    <span><i class="lg lg-net"></i>4G / HTTPS</span>
+                    <span><i class="lg lg-pkt"></i>Packet copy (colour = packet)</span>
+                </div>
+
+                <div class="uploads" id="uploads">
+                    <div class="uploads-head">
+                        <h3>Last bridge upload</h3>
+                        <span class="card-sub" id="uploadsSummary">No uploads yet</span>
+                    </div>
+                    <ul class="upload-list" id="uploadList"></ul>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Accounts -->
+    <section class="card" aria-labelledby="accountsTitle">
+        <div class="card-head">
+            <div>
+                <h2 id="accountsTitle">Accounts</h2>
+                <p class="card-sub">Bank-side ledger balances — they only move once a packet settles</p>
+            </div>
+        </div>
+        <div class="accounts" id="accounts"></div>
+    </section>
+
+    <div class="layout-bottom">
+        <section class="card" aria-labelledby="ledgerTitle">
+            <div class="card-head">
+                <div>
+                    <h2 id="ledgerTitle">Transaction ledger</h2>
+                    <p class="card-sub">Most recent 20 entries</p>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="ledger">
+                    <thead>
+                    <tr>
+                        <th>#</th><th>Payment</th><th class="num">Amount</th><th>Status</th>
+                        <th>Delivered by</th><th>Hops</th><th>Time offline</th><th>Settled</th>
+                    </tr>
+                    </thead>
+                    <tbody id="ledgerBody"></tbody>
+                </table>
+            </div>
+            <div class="empty" id="ledgerEmpty" hidden>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16l-3-2-2 2-2-2-2 2-2-2-3 2Z M9 9h6M9 13h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                <div>No transactions yet. Compose a payment, gossip it, then upload from the bridge.</div>
+            </div>
+        </section>
+
+        <section class="card log-card" aria-labelledby="logTitle">
+            <div class="card-head">
+                <div>
+                    <h2 id="logTitle">Activity</h2>
+                    <p class="card-sub">This session</p>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" id="clearLogBtn">Clear</button>
+            </div>
+            <ul class="log" id="log" aria-live="polite"></ul>
+        </section>
+    </div>
+
+</main>
+
+<div class="toasts" id="toasts" aria-live="assertive"></div>
+
+<script th:src="@{/js/dashboard.js}" src="/js/dashboard.js"></script>
 </body>
 </html>
